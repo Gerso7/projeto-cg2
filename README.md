@@ -28,3 +28,5 @@ O projeto deve seguir estes requisitos:
 
 Gere um código direto, sem funções extras, apenas o pedido priorizando a clareza e comentários explicando o passo a passo de forma funcional e humana do ciclo de vida do THREE.Group temporário.
 Ajustes Humanos: Ajustamos o tempo da animação para que o giro não fosse rápido demais, facilitando a visualização dos cubos entrando e saindo do escopo do grupo.
+
+Ajustes Humanos: Ajustamos o tempo da animação para que o giro não fosse rápido demais, facilitando a visualização dos cubos entrando e saindo do escopo do grupo, alem de algumas funcoes extras.
