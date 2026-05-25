@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Cubo Mágico 3D</title>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <style>
+    body { margin: 0; background: #111; overflow: hidden; font-family: monospace; }
+
+    #ui {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      background: #1a1a2e;
+      color: #cdd6f4;
+      border: 1px solid #44475a;
+      border-radius: 8px;
+      padding: 9px 18px;
+      font-family: monospace;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    button:hover:not(:disabled) { background: #2e2e4a; }
+    button:disabled { opacity: 0.35; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+<div id="ui">
+  <button id="btn-up">↑ Face Superior</button>
+  <button id="btn-front">⬤ Face Frontal</button>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// --- cena, câmera, renderer ---
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x111118);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(4, 3, 5);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+// --- 27 cubinhos ---
+
+// BoxGeometry(0.95) cria um gap natural entre os cubinhos sem precisar de outline
+const cubelets = [];
+
+for (let x = -1; x <= 1; x++) {
+  for (let y = -1; y <= 1; y++) {
+    for (let z = -1; z <= 1; z++) {
+
+      // BoxGeometry tem 6 grupos de material nessa ordem:
+      // [0] +X  [1] -X  [2] +Y  [3] -Y  [4] +Z  [5] -Z
+      const mats = [
+        new THREE.MeshBasicMaterial({ color: x ===  1 ? 0x009b48 : 0x111111 }), // +X verde
+        new THREE.MeshBasicMaterial({ color: x === -1 ? 0x0046ad : 0x111111 }), // -X azul
+        new THREE.MeshBasicMaterial({ color: y ===  1 ? 0xffffff : 0x111111 }), // +Y branco
+        new THREE.MeshBasicMaterial({ color: y === -1 ? 0xffd700 : 0x111111 }), // -Y amarelo
+        new THREE.MeshBasicMaterial({ color: z ===  1 ? 0xb71234 : 0x111111 }), // +Z vermelho
+        new THREE.MeshBasicMaterial({ color: z === -1 ? 0xff5800 : 0x111111 }), // -Z laranja
+      ];
+
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.95, 0.95), mats);
+      mesh.position.set(x, y, z);
+      scene.add(mesh);
+      cubelets.push(mesh);
+    }
+  }
+}
+
+// --- rotação de face com Group temporário ---
+
+/*
+  Ciclo de vida do Group temporário:
+
+  1. CRIAR   — new THREE.Group() entra na scene como pivot vazio
+  2. MOVER   — group.add(cubinho) retira o cubinho da scene e o coloca dentro do group
+  3. ANIMAR  — giro o group no loop; os cubinhos acompanham por serem filhos dele
+  4. BAKE    — applyMatrix4 transfere a transformação do group pra dentro de cada cubinho
+  5. DEVOLVER — scene.add(cubinho) retira do pivot e volta pra scene
+  6. DESTRUIR — scene.remove(group) e o group some sem deixar rastro
+*/
+
+let pivot   = null;  // null = nenhuma rotação em andamento
+let rotAxis = null;
+let rotDir  = 1;
+let rotDone = 0;
+
+const ROT_TOTAL = Math.PI / 2;
+const ROT_SPEED = 4; // rad/s
+
+function startRotation(axis, layer, dir) {
+  if (pivot) return; // uma rotação por vez
+
+  // 1. cria o pivot e registra na scene
+  pivot = new THREE.Group();
+  scene.add(pivot);
+
+  // 2. filtra os cubinhos da camada e os transfere pro pivot
+  // group.add() cuida de retirá-los da scene automaticamente
+  cubelets
+    .filter(c => Math.round(c.position[axis]) === layer)
+    .forEach(c => pivot.add(c));
+
+  rotAxis = axis;
+  rotDir  = dir;
+  rotDone = 0;
+
+  btns.forEach(b => b.disabled = true);
+}
+
+function finishRotation() {
+  // snapa pro ângulo exato antes do bake pra não acumular erro
+  pivot.rotation[rotAxis] = ROT_TOTAL * rotDir;
+  pivot.updateMatrixWorld(true);
+
+  // 4 e 5. incorpora a matrix do group em cada cubinho e devolve pra scene
+  // spread porque scene.add() modifica pivot.children durante o loop
+  [...pivot.children].forEach(c => {
+    c.applyMatrix4(pivot.matrixWorld); // bake: world do group vira local do cubinho
+
+    // arredonda pra evitar drift de float — sem isso position.y vira 0.999... e o filtro quebra
+    c.position.x = Math.round(c.position.x);
+    c.position.y = Math.round(c.position.y);
+    c.position.z = Math.round(c.position.z);
+    c.quaternion.normalize();
+
+    scene.add(c); // 5. remove do pivot e volta pra scene
+  });
+
+  // 6. group foi útil, agora some
+  scene.remove(pivot);
+  pivot = null;
+
+  btns.forEach(b => b.disabled = false);
+}
+
+// --- botões ---
+
+const btns = [
+  document.getElementById('btn-up'),
+  document.getElementById('btn-front'),
+];
+
+btns[0].addEventListener('click', () => startRotation('y',  1, -1));
+btns[1].addEventListener('click', () => startRotation('z',  1, -1));
+
+// --- loop de animação ---
+
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const delta = Math.min(clock.getDelta(), 0.1); // cap pra não explodir em abas inativas
+
+  // 3. avança a rotação do pivot frame a frame
+  if (pivot) {
+    const step = Math.min(ROT_SPEED * delta, ROT_TOTAL - rotDone);
+    pivot.rotation[rotAxis] += step * rotDir;
+    rotDone += step;
+
+    if (rotDone >= ROT_TOTAL - 0.0001) finishRotation();
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+animate();
+
+// --- responsividade ---
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
