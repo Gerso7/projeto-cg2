@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Cubo Mágico 3D - Com Embaralhar</title>
+  <title>Cubo Mágico 3D - 3 Faces + Embaralhar</title>
 
   <script type="importmap">
   {
@@ -48,6 +48,7 @@
 <div id="ui">
   <button id="btn-up">↑ Face Superior</button>
   <button id="btn-front">⬤ Face Frontal</button>
+  <button id="btn-right">➡ Face Direita</button>
   <button id="btn-shuffle">⟳ Embaralhar</button>
 </div>
 
@@ -143,12 +144,11 @@ function finishRotation() {
   scene.remove(pivot);
   pivot = null;
 
-  // Lógica do Embaralhamento: Se ainda tem movimento na fila, faz o próximo
+  // Lógica do Embaralhamento
   if (movimentosDeEmbaralhar > 0) {
     movimentosDeEmbaralhar--;
     proximoMovimentoEmbaralhar();
   } else {
-    // Se acabou de embaralhar (ou se foi um giro normal), restaura a velocidade e liga os botões
     rotSpeed = 4; 
     btns.forEach(b => b.disabled = false);
   }
@@ -157,9 +157,9 @@ function finishRotation() {
 // --- Lógica de Embaralhar ---
 
 function iniciarEmbaralhamento() {
-  if (pivot) return; // Não embaralha se estiver girando
-  movimentosDeEmbaralhar = 15; // Quantidade de giros aleatórios
-  rotSpeed = 15; // Acelera a animação bastante para o embaralhamento não demorar
+  if (pivot) return; 
+  movimentosDeEmbaralhar = 15; 
+  rotSpeed = 15; 
   proximoMovimentoEmbaralhar();
 }
 
@@ -168,7 +168,6 @@ function proximoMovimentoEmbaralhar() {
   const camadas = [-1, 1];
   const direcoes = [-1, 1];
 
-  // Escolhe atributos aleatórios
   const eixoSorteado = eixos[Math.floor(Math.random() * eixos.length)];
   const camadaSorteada = camadas[Math.floor(Math.random() * camadas.length)];
   const direcaoSorteada = direcoes[Math.floor(Math.random() * direcoes.length)];
@@ -181,12 +180,14 @@ function proximoMovimentoEmbaralhar() {
 const btns = [
   document.getElementById('btn-up'),
   document.getElementById('btn-front'),
-  document.getElementById('btn-shuffle') // O botão de embaralhar também bloqueia
+  document.getElementById('btn-right'), // Adicionado o botão da Face Direita
+  document.getElementById('btn-shuffle') 
 ];
 
-btns[0].addEventListener('click', () => startRotation('y',  1, -1));
-btns[1].addEventListener('click', () => startRotation('z',  1, -1));
-btns[2].addEventListener('click', iniciarEmbaralhamento);
+btns[0].addEventListener('click', () => startRotation('y',  1, -1)); // Cima (Y)
+btns[1].addEventListener('click', () => startRotation('z',  1, -1)); // Frente (Z)
+btns[2].addEventListener('click', () => startRotation('x',  1, -1)); // Direita (X) - Adicionado
+btns[3].addEventListener('click', iniciarEmbaralhamento);
 
 // --- loop de animação ---
 
@@ -198,7 +199,6 @@ function animate() {
   const delta = Math.min(clock.getDelta(), 0.1); 
 
   if (pivot) {
-    // Usa rotSpeed (que muda dependendo se está embaralhando ou jogando normal)
     const step = Math.min(rotSpeed * delta, ROT_TOTAL - rotDone);
     pivot.rotation[rotAxis] += step * rotDir;
     rotDone += step;
